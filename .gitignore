@@ -30,3 +30,4 @@ venv/
 graphify-out/
 
 *.toml
+*.db
