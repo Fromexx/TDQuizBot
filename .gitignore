@@ -30,4 +30,7 @@ venv/
 graphify-out/
 
 *.toml
-*.db
+# *.db
+*.db-shm
+*.db-wal
+test.py

@@ -13,7 +13,7 @@ class BotConfig(BaseModel):
 
 @lru_cache
 def parse_config_file() -> dict:
-    config_path = Path(__file__).parent.parent.joinpath('token.toml')
+    config_path = Path(__file__).parent.parent.parent.joinpath('token.toml')
     if not config_path.exists():
         error = 'Could not find token.toml'
         raise ValueError(error)
