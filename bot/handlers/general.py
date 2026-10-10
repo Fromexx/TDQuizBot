@@ -4,6 +4,8 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from DB.db import DataBase, Table, QuizColumn, QuestionColumn, AnswerColumn
+from bot.filters.filters import isPol
+from bot.utils.utils import texter, isUser
 
 router = Router()
 base = DataBase()
@@ -13,22 +15,18 @@ COMMANDS = ['start', 'help', 'list', 'new', 'delete', 'clear', 'close']
 class NewPol(StatesGroup):
     in_progress = State()
 
-
 class StartPol(StatesGroup):
     in_progress = State()
-
 
 @router.message(Command('start'))
 async def start(message: Message):
     text = 'Здарова!\n/help\n/list'
     await message.answer(text)
 
-
 @router.message(Command('help'))
 async def help(message: Message):
     text = 'Здесь подробная инструкция'
     await message.answer(text)
-
 
 @router.message(Command('list'))
 async def show_list(message: Message):
@@ -36,7 +34,6 @@ async def show_list(message: Message):
     titles_list = [f'/{titles["title"]}  ID: {titles["id"]}' for titles in titles_dict]
     text = 'Список актуальных опросов:\n' + '\n'.join(titles_list)
     await message.answer(text)
-
 
 @router.message(Command('delete'))
 async def delete_from_db(message: Message, command: CommandObject):
@@ -47,7 +44,6 @@ async def delete_from_db(message: Message, command: CommandObject):
     if (stripped := command_id.strip()).isdigit():
         info = await base.delete(Table.QUIZZES, int(stripped)) 
         await message.answer(f'Опрос [{stripped}] успешно удалён!'if info else f'Не удалось найти  опрос [{stripped}]. Проверьте ID!')
-
 
 @router.message(Command('clear'))
 async def clear_all(message: Message):
@@ -62,33 +58,6 @@ async def close_db(message: Message):
     await base.close()
     await message.answer('БД закрыта для изменений')
 
-
-class isPol(Filter):
-    async def __call__(self, message: Message) -> bool | dict:
-        if not (message.text and message.text.startswith('/')):
-            return False
-        pol = message.text[1:]
-        if pol in COMMANDS:
-            return False
-        titles_dict = await base.get_all(Table.QUIZZES, [QuizColumn.TITLE, QuizColumn.ID])
-        id_titles = {titles['title']:titles['id'] for titles in titles_dict}
-        if pol in list(id_titles.keys()):
-            return {'PolName': (pol, id_titles[pol])}
-        return False
-
-
-def texter(index: int, data: list, name: (str | None) = None, ):
-    if name is not None:
-        return f"Вы начали опрос {name}\n{'-'*20}\nВопрос {index+1}/{len(data)}:\n{data[index]}"
-    return f'Вопрос {index+1}/{len(data)}:\n{data[index]}'
-
-
-async def isUser(questions_ids: list, user_id: int):
-    ids_dict = await base.get_all(Table.USER_ANSWERS, [AnswerColumn.USER_ID, AnswerColumn.QUESTION_ID])
-    us_qu_id = [row[AnswerColumn.QUESTION_ID] for row in ids_dict if row[AnswerColumn.USER_ID]==user_id]
-    return set(questions_ids).issubset(set(us_qu_id))
-
-
 @router.message(isPol())
 async def starting_pol(message: Message, state: FSMContext, PolName: tuple[str, int]):
     QuizName = PolName[0]
@@ -102,7 +71,6 @@ async def starting_pol(message: Message, state: FSMContext, PolName: tuple[str, 
     await state.set_state(StartPol.in_progress)
     await state.update_data(index=0, questions=questions, questions_ids=questions_ids)
     await message.answer(texter(name=QuizName, index=0, data=questions))
-
 
 @router.message(StartPol.in_progress, F.text)
 async def get_answer(message: Message, state: FSMContext):
@@ -125,9 +93,8 @@ async def get_answer(message: Message, state: FSMContext):
     await message.answer(texter(index=index, data=questions))
     await state.update_data(index=index)
 
-
 @router.message(Command('new'))
-async def start(message: Message, command: CommandObject, state: FSMContext):
+async def new(message: Message, command: CommandObject, state: FSMContext):
     pol_name = command.args
     if pol_name is None:
         await message.answer('Введите название опроса')
@@ -144,7 +111,6 @@ async def start(message: Message, command: CommandObject, state: FSMContext):
     quiz_id = await base.insert(Table.QUIZZES, {QuizColumn.TITLE: str(pol_name.strip().upper())})
     await state.update_data(name=pol_name.strip().upper(), index=0, answers=[], pol_id=quiz_id)
     await message.answer('Начинаем создавать новый опрос. Присылай вопросы по порядку, пока не напишешь "стоп"')
-
 
 @router.message(NewPol.in_progress, F.text)
 async def get_questions(message: Message, state: FSMContext):
